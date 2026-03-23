@@ -1,3 +1,5 @@
+![preview](preview.svg)
+
 Yapay zeka ile tamamen otomatik çalışan bir X içerik sistemi kurdum.
 
 20+ haber kaynağı (Reddit, BBC, CNN, TechCrunch, Google News TR/EN) tarayıp, Türkçe içerik yazıp, her 3 saatte bir otomatik paylaşıyor.
@@ -14,5 +16,3 @@ Aylık toplam maliyet: sadece X API ücreti.
 Sistemi Claude ile doğal dilde yönetebiliyorum: "şu kaynağı ekle", "neden tweet atılmadı", "formatı değiştir" gibi komutlarla.
 
 Bir yıldızınızı alırım hayrınıza :)
-
-![preview](preview.svg)
