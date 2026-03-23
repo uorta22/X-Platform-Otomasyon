@@ -14,3 +14,5 @@ Aylık toplam maliyet: sadece X API ücreti.
 Sistemi Claude ile doğal dilde yönetebiliyorum: "şu kaynağı ekle", "neden tweet atılmadı", "formatı değiştir" gibi komutlarla.
 
 Bir yıldızınızı alırım hayrınıza :)
+
+![preview](assets/preview.svg)
