@@ -15,4 +15,4 @@ Sistemi Claude ile doğal dilde yönetebiliyorum: "şu kaynağı ekle", "neden t
 
 Bir yıldızınızı alırım hayrınıza :)
 
-![preview](assets/preview.svg)
+![preview](preview.svg)
