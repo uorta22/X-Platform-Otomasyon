@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X İçerik Makinesi — Kurulum Kılavuzu</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: #f5f5f3;
+    color: #1a1a1a;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+
+  .header {
+    padding: 0 0 1.25rem;
+    border-bottom: 1px solid #e0e0dc;
+    margin-bottom: 1.5rem;
+  }
+  .header h1 { font-size: 22px; font-weight: 600; color: #111; margin-bottom: 4px; }
+  .header p { font-size: 13px; color: #666; }
+
+  .progress-bar { display: flex; gap: 6px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .prog-dot { width: 32px; height: 5px; border-radius: 3px; background: #ddd; cursor: pointer; transition: background 0.2s; }
+  .prog-dot.active { background: #378ADD; }
+  .prog-dot.done { background: #1D9E75; }
+  .prog-dot:hover { background: #378ADD; opacity: 0.7; }
+
+  .step-card {
+    background: #fff;
+    border: 1px solid #e0e0dc;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #f0f0ec;
+    background: #fafafa;
+  }
+  .step-num {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+    flex-shrink: 0;
+    background: #E6F1FB; color: #0C447C;
+  }
+  .step-title { font-size: 15px; font-weight: 600; color: #111; }
+  .step-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .step-badge {
+    margin-left: auto; font-size: 11px;
+    padding: 3px 10px; border-radius: 20px; font-weight: 500; flex-shrink: 0;
+  }
+  .badge-free { background: #E1F5EE; color: #085041; }
+  .badge-paid { background: #FAEEDA; color: #633806; }
+  .badge-req  { background: #FCEBEB; color: #791F1F; }
+  .badge-new  { background: #EEEDFE; color: #3C3489; }
+
+  .step-body { padding: 1.25rem; }
+
+  .visual-block {
+    background: #f7f7f5;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e8e8e4;
+  }
+
+  .terminal {
+    background: #1a1a2e;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  }
+  .terminal .cmd  { color: #e8e8e8; font-size: 12px; }
+  .terminal .out  { color: #888; font-size: 11px; margin-top: 4px; }
+  .terminal .comment { color: #7F77DD; font-size: 11px; margin-top: 6px; font-style: italic; }
+  .terminal .green { color: #5DCAA5; font-size: 12px; }
+
+  .steps-list { list-style: none; }
+  .steps-list li {
+    display: flex; gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid #f0f0ec;
+    font-size: 13px; color: #222; line-height: 1.55;
+  }
+  .steps-list li:last-child { border-bottom: none; }
+  .step-icon {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #E6F1FB; color: #0C447C;
+    font-size: 10px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  .warn-box {
+    display: flex; gap: 8px;
+    background: #FAEEDA; border-radius: 8px;
+    padding: 10px 12px; margin-top: 10px;
+    font-size: 12px; color: #633806; line-height: 1.55;
+  }
+  .info-box {
+    display: flex; gap: 8px;
+    background: #E6F1FB; border-radius: 8px;
+    padding: 10px 12px; margin-top: 10px;
+    font-size: 12px; color: #0C447C; line-height: 1.55;
+  }
+  .purple-box {
+    display: flex; gap: 8px;
+    background: #EEEDFE; border-radius: 8px;
+    padding: 10px 12px; margin-top: 10px;
+    font-size: 12px; color: #3C3489; line-height: 1.55;
+  }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-bottom: 12px; }
+  .mini-card { background: #f7f7f5; border-radius: 8px; padding: 10px 12px; border: 1px solid #e8e8e4; }
+  .mini-card .mc-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .mini-card .mc-val   { font-size: 15px; font-weight: 600; color: #111; }
+
+  .prompt-pill {
+    display: inline-block;
+    background: #EEEDFE; color: #3C3489;
+    font-size: 11px; padding: 4px 10px;
+    border-radius: 20px; margin: 3px 3px 3px 0;
+    border: 1px solid #AFA9EC;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .nav-row {
+    display: flex; gap: 8px;
+    margin-top: 1.5rem;
+    justify-content: space-between; align-items: center;
+  }
+  .nav-btn {
+    padding: 9px 20px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border-radius: 8px;
+    border: 1px solid #ccc; background: #fff; color: #333;
+    transition: background 0.15s;
+  }
+  .nav-btn:hover:not(:disabled) { background: #f5f5f3; }
+  .nav-btn.primary { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .nav-btn.primary:hover:not(:disabled) { background: #0C447C; }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+  .step-counter { font-size: 13px; color: #888; }
+
+  code {
+    font-size: 11px; background: #f0f0ec;
+    padding: 1px 5px; border-radius: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .sec-label {
+    font-size: 11px; font-weight: 600; color: #888;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  svg { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>X İçerik Makinesi — Kurulum Kılavuzu</h1>
+    <p>n8n + Gemini AI + X API + Claude MCP — adım adım kurulum</p>
+  </div>
+
+  <div class="progress-bar" id="progressBar"></div>
+  <div id="stepContent"></div>
+
+  <div class="nav-row">
+    <button class="nav-btn" id="prevBtn" onclick="navigate(-1)">← Önceki</button>
+    <span class="step-counter" id="stepCounter"></span>
+    <button class="nav-btn primary" id="nextBtn" onclick="navigate(1)">Sonraki →</button>
+  </div>
+
+</div>
+
+<script>
+const steps = [
+  {
+    num: 1, title: "Mimari genel bakış", sub: "Sistemin nasıl çalıştığını anla", badge: null,
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 560 210" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs>
+              <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#378ADD"/>
+              </marker>
+              <marker id="a1p" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#7F77DD"/>
+              </marker>
+            </defs>
+            <rect x="10" y="70" width="90" height="60" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+            <text x="55" y="97" text-anchor="middle" font-size="11" font-weight="500" fill="#085041">20+</text>
+            <text x="55" y="112" text-anchor="middle" font-size="10" fill="#0F6E56">RSS kaynak</text>
+            <line x1="100" y1="100" x2="130" y2="100" stroke="#378ADD" stroke-width="1.2" marker-end="url(#a1)"/>
+            <rect x="132" y="60" width="100" height="80" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="182" y="94" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">n8n</text>
+            <text x="182" y="109" text-anchor="middle" font-size="10" fill="#185FA5">otomasyon</text>
+            <text x="182" y="122" text-anchor="middle" font-size="10" fill="#185FA5">motoru</text>
+            <line x1="232" y1="100" x2="262" y2="100" stroke="#378ADD" stroke-width="1.2" marker-end="url(#a1)"/>
+            <rect x="264" y="60" width="100" height="80" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="314" y="94" text-anchor="middle" font-size="11" font-weight="500" fill="#3C3489">Gemini AI</text>
+            <text x="314" y="109" text-anchor="middle" font-size="10" fill="#534AB7">Türkçe içerik</text>
+            <text x="314" y="122" text-anchor="middle" font-size="10" fill="#534AB7">üretimi</text>
+            <line x1="364" y1="100" x2="394" y2="100" stroke="#378ADD" stroke-width="1.2" marker-end="url(#a1)"/>
+            <rect x="396" y="60" width="100" height="80" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.8"/>
+            <text x="446" y="94" text-anchor="middle" font-size="11" font-weight="500" fill="#712B13">X API</text>
+            <text x="446" y="109" text-anchor="middle" font-size="10" fill="#993C1D">otomatik</text>
+            <text x="446" y="122" text-anchor="middle" font-size="10" fill="#993C1D">paylaşım</text>
+            <rect x="132" y="158" width="100" height="36" rx="6" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+            <text x="182" y="175" text-anchor="middle" font-size="10" font-weight="500" fill="#27500A">Google Sheets</text>
+            <text x="182" y="186" text-anchor="middle" font-size="9" fill="#3B6D11">arşiv + dedup</text>
+            <line x1="182" y1="140" x2="182" y2="158" stroke="#378ADD" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a1)"/>
+            <rect x="250" y="158" width="120" height="36" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="310" y="175" text-anchor="middle" font-size="10" font-weight="500" fill="#3C3489">Claude MCP</text>
+            <text x="310" y="186" text-anchor="middle" font-size="9" fill="#534AB7">workflow yönetimi</text>
+            <line x1="282" y1="140" x2="282" y2="158" stroke="#7F77DD" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a1p)"/>
+            <text x="280" y="32" text-anchor="middle" font-size="10" fill="#999" font-style="italic">her 3 saatte bir otomatik tetiklenir</text>
+          </svg>
+        </div>
+        <div class="grid2">
+          <div class="mini-card"><div class="mc-label">Günlük tweet</div><div class="mc-val">~8 paylaşım</div></div>
+          <div class="mini-card"><div class="mc-label">Tetiklenme sıklığı</div><div class="mc-val">Her 3 saat</div></div>
+          <div class="mini-card"><div class="mc-label">Aylık maliyet</div><div class="mc-val">$5–15</div></div>
+          <div class="mini-card"><div class="mc-label">Kaynak sayısı</div><div class="mc-val">20+</div></div>
+        </div>
+        <div class="info-box"><span>ℹ</span>&nbsp; Tek ücretli bileşen X API. n8n, Gemini ve Google Sheets tamamen ücretsiz.</div>
+      </div>`
+  },
+  {
+    num: 2, title: "Node.js ve n8n kurulumu", sub: "n8n'in çalışması için gerekli altyapı", badge: "ücretsiz", badgeClass: "badge-free",
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 420 75" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs><marker id="a2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#888"/></marker></defs>
+            <rect x="8" y="16" width="110" height="42" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+            <text x="63" y="40" text-anchor="middle" font-size="12" font-weight="500" fill="#085041">nodejs.org</text>
+            <line x1="118" y1="37" x2="144" y2="37" stroke="#888" stroke-width="1" marker-end="url(#a2)"/>
+            <rect x="146" y="16" width="105" height="42" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="198" y="33" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">LTS sürümü</text>
+            <text x="198" y="48" text-anchor="middle" font-size="10" fill="#185FA5">indir &amp; kur</text>
+            <line x1="251" y1="37" x2="277" y2="37" stroke="#888" stroke-width="1" marker-end="url(#a2)"/>
+            <rect x="279" y="16" width="130" height="42" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="344" y="33" text-anchor="middle" font-size="11" font-weight="500" fill="#3C3489">node --version</text>
+            <text x="344" y="48" text-anchor="middle" font-size="10" fill="#534AB7">v18+ görmelisin</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span><strong>nodejs.org</strong> adresine git, "LTS" sürümünü indir ve kur (tüm ayarları varsayılan bırak)</span></li>
+          <li><span class="step-icon">2</span><span>Terminal (Mac) veya Command Prompt (Windows) aç ve n8n'i global kur:</span></li>
+        </ul>
+        <div class="terminal">
+          <div class="green">$ <span class="cmd">node --version</span></div>
+          <div class="out">v18.x.x veya üzeri görmelisin</div>
+          <div class="green" style="margin-top:8px">$ <span class="cmd">npm install n8n -g</span></div>
+          <div class="out">n8n global olarak kuruluyor... (2-5 dk sürebilir)</div>
+          <div class="green" style="margin-top:8px">$ <span class="cmd">n8n start</span></div>
+          <div class="out">Editor is now accessible via: http://localhost:5678</div>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">3</span><span>Tarayıcıda <strong>http://localhost:5678</strong>'e git ve hesap oluştur</span></li>
+          <li><span class="step-icon">4</span><span>Arka planda çalışması için: <code>npm install pm2 -g && pm2 start n8n && pm2 save</code></span></li>
+        </ul>
+        <div class="warn-box"><span>⚠</span>&nbsp; Mac'te bilgisayar uyku moduna girince n8n durur. Sürekli çalışma için Railway, Render veya VPS önerilir.</div>
+      </div>`
+  },
+  {
+    num: 3, title: "Claude + n8n MCP entegrasyonu", sub: "Claude ile n8n'i doğal dilde yönet", badge: "yeni", badgeClass: "badge-new",
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 520 105" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs>
+              <marker id="a3" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#7F77DD"/></marker>
+            </defs>
+            <rect x="10" y="28" width="115" height="50" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="67" y="50" text-anchor="middle" font-size="11" font-weight="500" fill="#3C3489">claude.ai</text>
+            <text x="67" y="64" text-anchor="middle" font-size="10" fill="#534AB7">Proje &gt; MCP</text>
+            <text x="67" y="75" text-anchor="middle" font-size="9" fill="#7F77DD">Servers</text>
+            <line x1="125" y1="53" x2="163" y2="53" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a3)"/>
+            <rect x="165" y="18" width="190" height="70" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/>
+            <text x="260" y="40" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">MCP bağlantısı</text>
+            <text x="260" y="55" text-anchor="middle" font-size="10" fill="#185FA5">URL: http://localhost:5678/mcp</text>
+            <text x="260" y="68" text-anchor="middle" font-size="10" fill="#185FA5">API Key: n8n'den alınan key</text>
+            <text x="260" y="80" text-anchor="middle" font-size="9" fill="#1D9E75">→ yeşil tik = bağlı</text>
+            <line x1="355" y1="53" x2="393" y2="53" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a3)"/>
+            <rect x="395" y="28" width="115" height="50" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="452" y="50" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">n8n</text>
+            <text x="452" y="64" text-anchor="middle" font-size="10" fill="#185FA5">localhost:5678</text>
+            <text x="452" y="76" text-anchor="middle" font-size="9" fill="#1D9E75">tam erişim</text>
+            <text x="260" y="100" text-anchor="middle" font-size="9" fill="#aaa" font-style="italic">Model Context Protocol — iki yönlü iletişim</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span>n8n arayüzünde sağ üst köşedeki kullanıcı ikonuna tıkla → <strong>Settings → API</strong> → "Create API Key" → oluşan key'i kopyala</span></li>
+          <li><span class="step-icon">2</span><span><strong>claude.ai</strong>'ye git → bir Proje aç → proje ayarlarından <strong>Integrations / MCP Servers</strong> bölümüne git</span></li>
+          <li><span class="step-icon">3</span><span>"Add MCP Server" tıkla ve aşağıdaki bilgileri gir:</span></li>
+        </ul>
+        <div class="terminal">
+          <div class="cmd">Name:    n8n-mcp</div>
+          <div class="cmd" style="margin-top:4px">URL:     http://localhost:5678/mcp</div>
+          <div class="cmd" style="margin-top:4px">API Key: (n8n'den aldığın key)</div>
+          <div class="comment">→ "Connect" tıkla, yeşil tik görünmeli</div>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">4</span><span>Bağlantıyı test et — Claude'a şunu yaz: <em>"n8n'deki workflow'ları listele"</em> → Claude n8n'ini okuyabiliyorsa bağlantı çalışıyor</span></li>
+        </ul>
+        <div class="warn-box"><span>⚠</span>&nbsp; n8n API key'ini Claude sohbetine yapıştırma — sadece MCP Server kurulum ekranına gir. Bu key n8n'ine tam erişim sağlar.</div>
+        <div class="purple-box"><span>★</span>&nbsp; MCP bağlantısı kurulduktan sonra workflow'u manuel import etmene gerek kalmaz — Claude otomatik oluşturabilir.</div>
+        <div style="margin-top:14px">
+          <div class="sec-label">Örnek komutlar</div>
+          <div>
+            <span class="prompt-pill">n8n'deki workflow'ları listele</span>
+            <span class="prompt-pill">X İçerik Makinesi workflow'unu oluştur</span>
+            <span class="prompt-pill">Son execution'ın sonucunu kontrol et</span>
+            <span class="prompt-pill">Workflow'u test et</span>
+            <span class="prompt-pill">Workflow'u aktif et</span>
+            <span class="prompt-pill">Fintech haberlerini de dahil et</span>
+            <span class="prompt-pill">Neden tweet atılmadı?</span>
+            <span class="prompt-pill">Flood thread'i 5 tweet'e çıkar</span>
+          </div>
+        </div>
+      </div>`
+  },
+  {
+    num: 4, title: "X (Twitter) API kurulumu", sub: "Tweet gönderebilmek için zorunlu", badge: "ücretli", badgeClass: "badge-paid",
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 490 78" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs><marker id="a4" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#888"/></marker></defs>
+            <rect x="6" y="14" width="100" height="50" rx="6" fill="#FAECE7" stroke="#993C1D" stroke-width="0.8"/>
+            <text x="56" y="36" text-anchor="middle" font-size="11" font-weight="500" fill="#712B13">developer</text>
+            <text x="56" y="50" text-anchor="middle" font-size="10" fill="#993C1D">.x.com'da</text>
+            <text x="56" y="62" text-anchor="middle" font-size="10" fill="#993C1D">hesap aç</text>
+            <line x1="106" y1="39" x2="128" y2="39" stroke="#888" stroke-width="1" marker-end="url(#a4)"/>
+            <rect x="130" y="14" width="100" height="50" rx="6" fill="#FAECE7" stroke="#993C1D" stroke-width="0.8"/>
+            <text x="180" y="36" text-anchor="middle" font-size="11" font-weight="500" fill="#712B13">App oluştur</text>
+            <text x="180" y="50" text-anchor="middle" font-size="10" fill="#993C1D">API Key &amp;</text>
+            <text x="180" y="62" text-anchor="middle" font-size="10" fill="#993C1D">Secret al</text>
+            <line x1="230" y1="39" x2="252" y2="39" stroke="#888" stroke-width="1" marker-end="url(#a4)"/>
+            <rect x="254" y="14" width="106" height="50" rx="6" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1.2"/>
+            <text x="307" y="34" text-anchor="middle" font-size="11" font-weight="500" fill="#791F1F">Pay-per-use</text>
+            <text x="307" y="48" text-anchor="middle" font-size="10" fill="#A32D2D">plana geç</text>
+            <text x="307" y="61" text-anchor="middle" font-size="9" fill="#A32D2D">(zorunlu!)</text>
+            <line x1="360" y1="39" x2="382" y2="39" stroke="#888" stroke-width="1" marker-end="url(#a4)"/>
+            <rect x="384" y="14" width="98" height="50" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="433" y="34" text-anchor="middle" font-size="11" font-weight="500" fill="#0C447C">n8n'de</text>
+            <text x="433" y="48" text-anchor="middle" font-size="10" fill="#185FA5">credential</text>
+            <text x="433" y="61" text-anchor="middle" font-size="10" fill="#185FA5">bağla</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span><strong>developer.x.com</strong>'a git, X hesabınla giriş yap ve geliştirici hesabı oluştur (250+ karakter açıklama yaz)</span></li>
+          <li><span class="step-icon">2</span><span>"Projects & Apps" → "Create App" → "Keys and Tokens" sekmesinden API Key, Secret, Client ID ve Client Secret'ı güvenli bir yere kaydet</span></li>
+          <li><span class="step-icon">3</span><span><strong>console.x.com</strong> → Billing → Pay-per-use planına geç</span></li>
+          <li><span class="step-icon">4</span><span>App izinleri: <em>Read and write</em> | Callback URL: <code>http://localhost:5678/rest/oauth2-credential/callback</code></span></li>
+          <li><span class="step-icon">5</span><span>n8n → Credentials → Add Credential → "Twitter OAuth2 API" → Client ID & Secret gir → X hesabınla yetkilendir</span></li>
+        </ul>
+        <div class="warn-box"><span>⚠</span>&nbsp; Free tier ile tweet gönderince 503 hatası alırsın. Pay-per-use planı zorunlu (~$5-15/ay).</div>
+      </div>`
+  },
+  {
+    num: 5, title: "Google Gemini API kurulumu", sub: "İçerik üretim motoru — ücretsiz tier yeterli", badge: "ücretsiz", badgeClass: "badge-free",
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 430 76" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs><marker id="a5" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#888"/></marker></defs>
+            <rect x="8" y="16" width="112" height="44" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="64" y="36" text-anchor="middle" font-size="11" font-weight="500" fill="#3C3489">aistudio</text>
+            <text x="64" y="50" text-anchor="middle" font-size="10" fill="#534AB7">.google.com</text>
+            <line x1="120" y1="38" x2="146" y2="38" stroke="#888" stroke-width="1" marker-end="url(#a5)"/>
+            <rect x="148" y="16" width="112" height="44" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="204" y="36" text-anchor="middle" font-size="11" font-weight="500" fill="#3C3489">Get API Key</text>
+            <text x="204" y="50" text-anchor="middle" font-size="10" fill="#534AB7">→ Create</text>
+            <line x1="260" y1="38" x2="286" y2="38" stroke="#888" stroke-width="1" marker-end="url(#a5)"/>
+            <rect x="288" y="16" width="134" height="44" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+            <text x="355" y="36" text-anchor="middle" font-size="11" font-weight="500" fill="#085041">GeminiIsle node</text>
+            <text x="355" y="50" text-anchor="middle" font-size="10" fill="#0F6E56">code içine yapıştır</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span><strong>aistudio.google.com</strong>'a git, Google hesabınla giriş yap</span></li>
+          <li><span class="step-icon">2</span><span>Sol menü → "Get API Key" → "Create API Key" → Yeni proje oluştur → Key'i kopyala</span></li>
+          <li><span class="step-icon">3</span><span>n8n'de <strong>GeminiIsle</strong> node'una çift tıkla, code editörde şu satırı bul ve key'ini gir:</span></li>
+        </ul>
+        <div class="terminal">
+          <div class="cmd">var GEMINI_KEY = 'GEMINI_KEY_BURAYA_YAZ';</div>
+          <div class="out" style="margin-top:6px">↑ bu kısmı gerçek key'inle değiştir, sonra Ctrl+S ile kaydet</div>
+        </div>
+        <div class="grid2">
+          <div class="mini-card"><div class="mc-label">Free tier limit</div><div class="mc-val">250 istek/gün</div></div>
+          <div class="mini-card"><div class="mc-label">Sistem kullanımı</div><div class="mc-val">~8 istek/gün</div></div>
+        </div>
+        <div class="warn-box"><span>⚠</span>&nbsp; Workflow her güncellendiğinde Gemini key sıfırlanır. Güncelleme sonrası bu adımı tekrarla.</div>
+      </div>`
+  },
+  {
+    num: 6, title: "Google Sheets kurulumu", sub: "Arşiv ve tekrar engelleme (dedup)", badge: "ücretsiz", badgeClass: "badge-free",
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 480 88" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <rect x="10" y="12" width="440" height="30" rx="6" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.8"/>
+            <text x="30" y="31" font-size="10" font-weight="500" fill="#27500A">baslik</text>
+            <line x1="88" y1="12" x2="88" y2="42" stroke="#3B6D11" stroke-width="0.4"/>
+            <text x="103" y="31" font-size="10" fill="#3B6D11">kaynak</text>
+            <line x1="158" y1="12" x2="158" y2="42" stroke="#3B6D11" stroke-width="0.4"/>
+            <text x="170" y="31" font-size="10" fill="#3B6D11">url</text>
+            <line x1="208" y1="12" x2="208" y2="42" stroke="#3B6D11" stroke-width="0.4"/>
+            <text x="220" y="31" font-size="10" fill="#3B6D11">puan</text>
+            <line x1="268" y1="12" x2="268" y2="42" stroke="#3B6D11" stroke-width="0.4"/>
+            <text x="280" y="31" font-size="10" fill="#3B6D11">hookTweet / flood1-3 / ctaTweet</text>
+            <line x1="418" y1="12" x2="418" y2="42" stroke="#3B6D11" stroke-width="0.4"/>
+            <text x="424" y="31" font-size="10" fill="#3B6D11">durum</text>
+            <rect x="10" y="46" width="440" height="20" fill="#f7f7f5" stroke="#c8e6c9" stroke-width="0.4"/>
+            <text x="20" y="60" font-size="9" fill="#666">AI haberleri 2026 — yayınlandı</text>
+            <rect x="10" y="66" width="440" height="20" fill="#fff" stroke="#c8e6c9" stroke-width="0.4"/>
+            <text x="20" y="80" font-size="9" fill="#999">Fintech yatırım raporu — bekliyor</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span><strong>sheets.google.com</strong>'da yeni bir spreadsheet oluştur</span></li>
+          <li><span class="step-icon">2</span><span>Alt sekmenin adını <strong>İcerikler</strong> olarak değiştir (çift tıkla)</span></li>
+          <li><span class="step-icon">3</span><span>İlk satıra sütun başlıklarını yaz: <code>baslik | kaynak | url | puan | hookTweet | flood1 | flood2 | flood3 | ctaTweet | durum | tarih</code></span></li>
+          <li><span class="step-icon">4</span><span>n8n → Credentials → Add Credential → "Google Sheets OAuth2 API" → Google hesabınla yetkilendir</span></li>
+        </ul>
+        <div class="info-box"><span>ℹ</span>&nbsp; "This app is not verified" uyarısı gelirse: Advanced → Go to [uygulama adı] → İzin ver</div>
+      </div>`
+  },
+  {
+    num: 7, title: "Workflow import ve aktivasyon", sub: "Her şeyi bağla ve çalıştır", badge: null,
+    content: () => `
+      <div class="step-body">
+        <div class="visual-block">
+          <svg viewBox="0 0 540 62" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+            <defs><marker id="a7" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#888"/></marker></defs>
+            <rect x="4" y="10" width="80" height="42" rx="5" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="44" y="28" text-anchor="middle" font-size="10" font-weight="500" fill="#0C447C">Workflow</text>
+            <text x="44" y="42" text-anchor="middle" font-size="9" fill="#185FA5">import et</text>
+            <line x1="84" y1="31" x2="100" y2="31" stroke="#888" stroke-width="1" marker-end="url(#a7)"/>
+            <rect x="102" y="10" width="80" height="42" rx="5" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="142" y="28" text-anchor="middle" font-size="10" font-weight="500" fill="#0C447C">Sheets</text>
+            <text x="142" y="42" text-anchor="middle" font-size="9" fill="#185FA5">credential</text>
+            <line x1="182" y1="31" x2="198" y2="31" stroke="#888" stroke-width="1" marker-end="url(#a7)"/>
+            <rect x="200" y="10" width="80" height="42" rx="5" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+            <text x="240" y="28" text-anchor="middle" font-size="10" font-weight="500" fill="#0C447C">X OAuth2</text>
+            <text x="240" y="42" text-anchor="middle" font-size="9" fill="#185FA5">credential</text>
+            <line x1="280" y1="31" x2="296" y2="31" stroke="#888" stroke-width="1" marker-end="url(#a7)"/>
+            <rect x="298" y="10" width="80" height="42" rx="5" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+            <text x="338" y="28" text-anchor="middle" font-size="10" font-weight="500" fill="#3C3489">Gemini key</text>
+            <text x="338" y="42" text-anchor="middle" font-size="9" fill="#534AB7">code'a yaz</text>
+            <line x1="378" y1="31" x2="394" y2="31" stroke="#888" stroke-width="1" marker-end="url(#a7)"/>
+            <rect x="396" y="10" width="136" height="42" rx="5" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1.2"/>
+            <text x="464" y="28" text-anchor="middle" font-size="10" font-weight="500" fill="#085041">Test et → Aktif et</text>
+            <text x="464" y="42" text-anchor="middle" font-size="9" fill="#0F6E56">Inactive → Active</text>
+          </svg>
+        </div>
+        <ul class="steps-list">
+          <li><span class="step-icon">1</span><span>n8n → Workflows → "Import from File" ile workflow JSON'unu yükle <strong>veya</strong> Claude'a "X İçerik Makinesi workflow'unu oluştur" de (MCP varsa)</span></li>
+          <li><span class="step-icon">2</span><span><strong>Eski Basliklar</strong> ve <strong>Sheets Kaydet</strong> node'larına Google Sheets credential'ını bağla</span></li>
+          <li><span class="step-icon">3</span><span><strong>Hook Tweet, Reply1-3, CTA</strong> node'larına Twitter OAuth2 credential'ını bağla</span></li>
+          <li><span class="step-icon">4</span><span><strong>GeminiIsle</strong> node'una çift tıkla → Gemini API key'ini code içine yaz → Kaydet</span></li>
+          <li><span class="step-icon">5</span><span>Cmd+Shift+R (Mac) / Ctrl+Shift+R (Windows) ile cache temizle → "Test Workflow" → tüm node'larda yeşil tik görmelisin</span></li>
+          <li><span class="step-icon">6</span><span>Test başarılıysa sağ üstteki <strong>Inactive</strong> toggle'ını <strong>Active</strong> yap — sistem her 3 saatte otomatik çalışır</span></li>
+        </ul>
+        <div class="warn-box"><span>⚠</span>&nbsp; Workflow her güncellendiğinde Gemini key sıfırlanır — 4. adımı tekrarla.</div>
+        <div class="info-box" style="margin-top:8px"><span>ℹ</span>&nbsp; Claude + MCP bağlantısı varsa workflow'u manuel kurmana gerek yok — Claude doğrudan oluşturur.</div>
+      </div>`
+  },
+  {
+    num: 8, title: "Sık hatalar ve güvenlik", sub: "Sorun giderme ve API güvenliği", badge: "önemli", badgeClass: "badge-req",
+    content: () => `
+      <div class="step-body">
+        <div class="sec-label" style="margin-bottom:10px">Sık hatalar</div>
+        <ul class="steps-list" style="margin-bottom:16px">
+          <li><span class="step-icon" style="background:#FCEBEB;color:#791F1F">!</span><span><strong>503 hatası</strong> — Free tier ile tweet gönderilemiyor. console.x.com → pay-per-use plana geç.</span></li>
+          <li><span class="step-icon" style="background:#FCEBEB;color:#791F1F">!</span><span><strong>400 hatası</strong> — Tweet içeriği boş. GeminiIsle node'unda key'i kontrol et.</span></li>
+          <li><span class="step-icon" style="background:#FAEEDA;color:#633806">!</span><span><strong>429 hatası</strong> — Gemini günlük limit doldu. Gece yarısı Pacific Time sıfırlanır, bekle.</span></li>
+          <li><span class="step-icon" style="background:#FAEEDA;color:#633806">!</span><span><strong>Değişiklikler yansımadı</strong> — Cmd+Shift+R / Ctrl+Shift+R ile hard refresh yap.</span></li>
+          <li><span class="step-icon" style="background:#FAEEDA;color:#633806">!</span><span><strong>n8n uyku modunda durdu</strong> — pm2 çözüm değil. Cloud hosting gerekli (Railway, Render, VPS).</span></li>
+          <li><span class="step-icon" style="background:#E6F1FB;color:#0C447C">i</span><span><strong>Aynı haber tekrar paylaşılıyor</strong> — Google Sheets "İcerikler" sheet başlık sütununu kontrol et.</span></li>
+        </ul>
+        <div class="sec-label" style="margin-bottom:10px">Güvenlik kuralları</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="background:#FCEBEB;border-radius:10px;padding:12px;border:1px solid #F09595">
+            <div style="font-size:11px;font-weight:600;color:#791F1F;margin-bottom:8px">ASLA yapma</div>
+            <div style="font-size:12px;color:#A32D2D;line-height:1.9">Key'leri sohbete yapıştırma<br>Email/mesajda paylaşma<br>GitHub'a commit etme<br>Düz metin dosyasında saklama</div>
+          </div>
+          <div style="background:#E1F5EE;border-radius:10px;padding:12px;border:1px solid #5DCAA5">
+            <div style="font-size:11px;font-weight:600;color:#085041;margin-bottom:8px">HER ZAMAN yap</div>
+            <div style="font-size:12px;color:#0F6E56;line-height:1.9">n8n credential ekranına yaz<br>Sızan key'i hemen regenerate et<br>Farklı servisler için farklı key<br>Key'in yerini not et (key'i değil)</div>
+          </div>
+        </div>
+      </div>`
+  }
+];
+
+let current = 0;
+
+function renderProgress() {
+  document.getElementById('progressBar').innerHTML = steps.map((s, i) => {
+    let cls = i < current ? 'done' : i === current ? 'active' : '';
+    return `<div class="prog-dot ${cls}" onclick="goTo(${i})" title="${s.title}"></div>`;
+  }).join('');
+}
+
+function renderStep() {
+  const s = steps[current];
+  const badgeHtml = s.badge ? `<span class="step-badge ${s.badgeClass}">${s.badge}</span>` : '';
+  document.getElementById('stepContent').innerHTML = `
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">${s.num}</div>
+        <div>
+          <div class="step-title">${s.title}</div>
+          <div class="step-sub">${s.sub}</div>
+        </div>
+        ${badgeHtml}
+      </div>
+      ${s.content()}
+    </div>`;
+  document.getElementById('stepCounter').textContent = `${current + 1} / ${steps.length}`;
+  document.getElementById('prevBtn').disabled = current === 0;
+  const nextBtn = document.getElementById('nextBtn');
+  nextBtn.textContent = current === steps.length - 1 ? 'Tamamlandı ✓' : 'Sonraki →';
+  nextBtn.disabled = false;
+  renderProgress();
+}
+
+function navigate(dir) {
+  if (dir === 1 && current < steps.length - 1) current++;
+  else if (dir === -1 && current > 0) current--;
+  renderStep();
+}
+
+function goTo(i) { current = i; renderStep(); }
+
+renderStep();
+</script>
+</body>
+</html>

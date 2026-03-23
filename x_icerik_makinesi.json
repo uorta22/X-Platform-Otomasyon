@@ -1,0 +1,300 @@
+{
+  "name": "X Icerik Makinesi v9 FINAL",
+  "_readme": "KURULUM: 1) GeminiIsle node'unda GEMINI_API_KEY_BURAYA yazisini gercek Gemini key'inle degistir. 2) YOUR_GOOGLE_SHEET_ID yazisini kendi Sheets ID'nle degistir. 3) Google Sheets ve Twitter OAuth2 credential'larini n8n'de olustur ve node'lara bagla.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "a1",
+      "name": "Her 3 Saatte Tetikle",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [64, 304]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Icerikler"
+        },
+        "options": {}
+      },
+      "id": "a0",
+      "name": "Eski Basliklar",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 304],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sheets'ten gelen eski basliklari al\nvar eskiBasliklar = [];\ntry {\n  var sheetsData = $input.all();\n  for (var i = 0; i < sheetsData.length; i++) {\n    var b = sheetsData[i].json.baslik || '';\n    if (b) eskiBasliklar.push(b.toLowerCase().trim());\n  }\n} catch(e) { eskiBasliklar = []; }\n\nvar allItems = [];\n\n// === REDDIT KAYNAKLAR ===\nvar subs = ['worldnews','technology','science','artificial','Futurology','economics','geopolitics','space','environment','ChatGPT','singularity','indiehackers','LocalLLaMA','StableDiffusion','MachineLearning'];\nfor (var s = 0; s < subs.length; s++) {\n  try {\n    var r = await this.helpers.httpRequest({ method:'GET', url:'https://www.reddit.com/r/'+subs[s]+'/hot.json?limit=4', headers:{'User-Agent':'n8n/1.0'}, timeout:10000 });\n    var d = typeof r==='string'?JSON.parse(r):r;\n    var ch=(d.data||{}).children||[];\n    for(var c=0;c<ch.length;c++){var p=ch[c].data||{};if(p.stickied||p.score<50)continue;allItems.push({baslik:p.title||'',kaynak:'Reddit r/'+subs[s],puan:p.score||0,yorum:p.num_comments||0,ozet:(p.selftext||'').substring(0,300),url:'https://reddit.com'+(p.permalink||''),kategori:'reddit'});}\n  }catch(e){continue;}\n}\nvar finSubs = ['fintech','CryptoCurrency','economy','StockMarket'];\nfor(var fs=0;fs<finSubs.length;fs++){try{var rf=await this.helpers.httpRequest({method:'GET',url:'https://www.reddit.com/r/'+finSubs[fs]+'/hot.json?limit=3',headers:{'User-Agent':'n8n/1.0'},timeout:10000});var df=typeof rf==='string'?JSON.parse(rf):rf;var chf=(df.data||{}).children||[];for(var cf2=0;cf2<chf.length;cf2++){var pf=chf[cf2].data||{};if(pf.stickied||pf.score<30)continue;allItems.push({baslik:pf.title||'',kaynak:'Reddit r/'+finSubs[fs],puan:pf.score||0,yorum:pf.num_comments||0,ozet:(pf.selftext||'').substring(0,300),url:'https://reddit.com'+(pf.permalink||''),kategori:'reddit'});}}catch(e){continue;}}\n\n// === GITHUB TRENDING AI ===\ntry{\n  var gh=await this.helpers.httpRequest({method:'GET',url:'https://api.github.com/search/repositories?q=AI+OR+LLM+OR+agent+OR+machine-learning+created:>2026-03-01&sort=stars&order=desc&per_page=5',headers:{'User-Agent':'n8n/1.0','Accept':'application/vnd.github.v3+json'},timeout:10000});\n  var ghd=typeof gh==='string'?JSON.parse(gh):gh;\n  var ghItems=(ghd.items||[]);\n  for(var gi=0;gi<ghItems.length;gi++){var repo=ghItems[gi];if(repo.stargazers_count>100){allItems.push({baslik:repo.full_name+': '+repo.description,kaynak:'GitHub Trending',puan:repo.stargazers_count||0,yorum:repo.forks_count||0,ozet:'Stars: '+repo.stargazers_count+' | Language: '+(repo.language||'?'),url:repo.html_url||'',kategori:'github'});}}\n}catch(e){}\ntry{\n  var gh2=await this.helpers.httpRequest({method:'GET',url:'https://api.github.com/search/repositories?q=awesome+AI+tools+OR+awesome+LLM+pushed:>2026-03-01&sort=updated&order=desc&per_page=5',headers:{'User-Agent':'n8n/1.0','Accept':'application/vnd.github.v3+json'},timeout:10000});\n  var ghd2=typeof gh2==='string'?JSON.parse(gh2):gh2;\n  var ghItems2=(ghd2.items||[]);\n  for(var gi2=0;gi2<ghItems2.length;gi2++){var repo2=ghItems2[gi2];if(repo2.stargazers_count>500){allItems.push({baslik:repo2.full_name+': '+repo2.description,kaynak:'GitHub Awesome',puan:repo2.stargazers_count||0,yorum:repo2.forks_count||0,ozet:'Stars: '+repo2.stargazers_count,url:repo2.html_url||'',kategori:'github'});}}\n}catch(e){}\n\n// === HACKER NEWS ===\ntry{\n  var hn=await this.helpers.httpRequest({method:'GET',url:'https://hacker-news.firebaseio.com/v0/topstories.json',timeout:10000});\n  var ids=typeof hn==='string'?JSON.parse(hn):hn;\n  for(var h=0;h<Math.min((ids||[]).length,8);h++){try{var st=await this.helpers.httpRequest({method:'GET',url:'https://hacker-news.firebaseio.com/v0/item/'+ids[h]+'.json',timeout:5000});var s2=typeof st==='string'?JSON.parse(st):st;if(s2&&s2.score>50)allItems.push({baslik:s2.title||'',kaynak:'Hacker News',puan:s2.score||0,yorum:s2.descendants||0,ozet:'',url:s2.url||'',kategori:'tech'});}catch(e2){continue;}}\n}catch(e){}\n\n// === DUNYA HABER KAYNAKLARI ===\nvar cnnFeeds=['http://rss.cnn.com/rss/edition.rss','http://rss.cnn.com/rss/money_news_international.rss'];\nfor(var cf=0;cf<cnnFeeds.length;cf++){try{var cnn=await this.helpers.httpRequest({method:'GET',url:cnnFeeds[cf],timeout:10000});var re1=new RegExp('<title>([^<]+)</title>','g');var m1;var cnt1=0;while((m1=re1.exec(cnn))!==null&&cnt1<3){var t1=m1[1].trim();if(t1.indexOf('CNN')===-1&&t1.length>15){allItems.push({baslik:t1,kaynak:'CNN',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cnt1++;}}}catch(e){}}\nvar bbcFeeds=['https://feeds.bbci.co.uk/news/rss.xml','https://feeds.bbci.co.uk/news/business/rss.xml','https://feeds.bbci.co.uk/news/science_and_environment/rss.xml'];\nfor(var bf=0;bf<bbcFeeds.length;bf++){try{var bbc=await this.helpers.httpRequest({method:'GET',url:bbcFeeds[bf],timeout:10000});var re2=new RegExp('<title>([^<]+)</title>','g');var m2;var cnt2=0;while((m2=re2.exec(bbc))!==null&&cnt2<3){var t2=m2[1].trim();if(t2.indexOf('BBC')===-1&&t2.length>15){allItems.push({baslik:t2,kaynak:'BBC',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cnt2++;}}}catch(e){}}\ntry{var bl=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q=site:bloomberg.com+OR+site:reuters.com&hl=en&gl=US&ceid=US:en',timeout:10000});var re3=new RegExp('<title>([^<]+)</title>','g');var m3;var cnt3=0;while((m3=re3.exec(bl))!==null&&cnt3<5){var t3=m3[1].trim();if(t3!=='Google News'&&t3.length>15){allItems.push({baslik:t3,kaynak:'Bloomberg/Reuters',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cnt3++;}}}catch(e){}\ntry{var aj=await this.helpers.httpRequest({method:'GET',url:'https://www.aljazeera.com/xml/rss/all.xml',timeout:10000});var re8=new RegExp('<title>([^<]+)</title>','g');var m8;var cnt8=0;while((m8=re8.exec(aj))!==null&&cnt8<4){var t8=m8[1].trim();if(t8.indexOf('Al Jazeera')===-1&&t8.length>15){allItems.push({baslik:t8,kaynak:'Al Jazeera',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cnt8++;}}}catch(e){}\ntry{var cnbc=await this.helpers.httpRequest({method:'GET',url:'https://www.cnbc.com/id/100003114/device/rss/rss.html',timeout:10000});var reCN=new RegExp('<title>([^<]+)</title>','g');var mCN;var cntCN=0;while((mCN=reCN.exec(cnbc))!==null&&cntCN<4){var tCN=mCN[1].trim();if(tCN.indexOf('CNBC')===-1&&tCN.length>15){allItems.push({baslik:tCN,kaynak:'CNBC',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cntCN++;}}}catch(e){}\ntry{var gne=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q=world+economy+OR+war+OR+geopolitics+OR+finance+OR+climate&hl=en&gl=US&ceid=US:en',timeout:10000});var re5=new RegExp('<title>([^<]+)</title>','g');var m5;var cnt5=0;while((m5=re5.exec(gne))!==null&&cnt5<5){var t5=m5[1].trim();if(t5!=='Google News'&&t5.length>15){allItems.push({baslik:t5,kaynak:'Google News World',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cnt5++;}}}catch(e){}\ntry{var bff=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q=site:ft.com+OR+site:bloomberg.com+finance+OR+markets+OR+economy&hl=en&gl=US&ceid=US:en',timeout:10000});var reBF=new RegExp('<title>([^<]+)</title>','g');var mBF;var cntBF=0;while((mBF=reBF.exec(bff))!==null&&cntBF<4){var tBF=mBF[1].trim();if(tBF!=='Google News'&&tBF.length>15){allItems.push({baslik:tBF,kaynak:'Bloomberg/FT',puan:0,yorum:0,ozet:'',url:'',kategori:'dunya'});cntBF++;}}}catch(e){}\n\n// === TURKIYE KAYNAKLARI ===\nvar trQ=['gundem+OR+ekonomi+OR+dolar+OR+savas+OR+secim','yapay+zeka+OR+teknoloji+OR+bilim','dunya+OR+NATO+OR+Rusya+OR+ABD+OR+Cin'];\nfor(var tq=0;tq<trQ.length;tq++){try{var gn=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q='+trQ[tq]+'&hl=tr&gl=TR&ceid=TR:tr',timeout:10000});var re4=new RegExp('<title>([^<]+)</title>','g');var m4;var cnt4=0;while((m4=re4.exec(gn))!==null&&cnt4<4){var t4=m4[1].trim();if(t4!=='Google News'&&t4.length>15){allItems.push({baslik:t4,kaynak:'Google News TR',puan:0,yorum:0,ozet:'',url:'',kategori:'turkiye'});cnt4++;}}}catch(e){}}\ntry{var gnf=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q=TCMB+OR+fintech+OR+dijital+banka+OR+faiz+OR+merkez+bankasi+OR+kripto&hl=tr&gl=TR&ceid=TR:tr',timeout:10000});var reFT=new RegExp('<title>([^<]+)</title>','g');var mFT;var cntFT=0;while((mFT=reFT.exec(gnf))!==null&&cntFT<4){var tFT=mFT[1].trim();if(tFT!=='Google News'&&tFT.length>15){allItems.push({baslik:tFT,kaynak:'Fintech TR',puan:0,yorum:0,ozet:'',url:'',kategori:'turkiye'});cntFT++;}}}catch(e){}\ntry{var gni=await this.helpers.httpRequest({method:'GET',url:'https://news.google.com/rss/search?q=yatirim+OR+girisim+OR+startup+OR+borsa+OR+BIST&hl=tr&gl=TR&ceid=TR:tr',timeout:10000});var reIS=new RegExp('<title>([^<]+)</title>','g');var mIS;var cntIS=0;while((mIS=reIS.exec(gni))!==null&&cntIS<4){var tIS=mIS[1].trim();if(tIS!=='Google News'&&tIS.length>15){allItems.push({baslik:tIS,kaynak:'Is Dunyasi TR',puan:0,yorum:0,ozet:'',url:'',kategori:'turkiye'});cntIS++;}}}catch(e){}\ntry{var wbr=await this.helpers.httpRequest({method:'GET',url:'https://webrazzi.com/feed/',timeout:10000});var reW=new RegExp('<title>([^<]+)</title>','g');var mW;var cntW=0;while((mW=reW.exec(wbr))!==null&&cntW<5){var tW=mW[1].trim();if(tW!=='Webrazzi'&&tW.length>10){allItems.push({baslik:tW,kaynak:'Webrazzi',puan:0,yorum:0,ozet:'',url:'',kategori:'turkiye'});cntW++;}}}catch(e){}\n\n// === TECH MEDYA ===\ntry{var tc=await this.helpers.httpRequest({method:'GET',url:'https://techcrunch.com/feed/',timeout:10000});var re6=new RegExp('<title>([^<]+)</title>','g');var m6;var cnt6=0;while((m6=re6.exec(tc))!==null&&cnt6<4){var t6=m6[1].trim();if(t6!=='TechCrunch'&&t6.length>10){allItems.push({baslik:t6,kaynak:'TechCrunch',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cnt6++;}}}catch(e){}\ntry{var tcv=await this.helpers.httpRequest({method:'GET',url:'https://techcrunch.com/category/venture/feed/',timeout:10000});var reTV=new RegExp('<title>([^<]+)</title>','g');var mTV;var cntTV=0;while((mTV=reTV.exec(tcv))!==null&&cntTV<4){var tTV=mTV[1].trim();if(tTV!=='TechCrunch'&&tTV.length>10){allItems.push({baslik:tTV,kaynak:'TechCrunch Venture',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cntTV++;}}}catch(e){}\ntry{var teu=await this.helpers.httpRequest({method:'GET',url:'https://tech.eu/feed/',timeout:10000});var reTE=new RegExp('<title>([^<]+)</title>','g');var mTE;var cntTE=0;while((mTE=reTE.exec(teu))!==null&&cntTE<4){var tTE=mTE[1].trim();if(tTE!=='Tech.eu'&&tTE.length>10){allItems.push({baslik:tTE,kaynak:'Tech.eu',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cntTE++;}}}catch(e){}\ntry{var cbn=await this.helpers.httpRequest({method:'GET',url:'https://news.crunchbase.com/feed/',timeout:10000});var reCB=new RegExp('<title>([^<]+)</title>','g');var mCB;var cntCB=0;while((mCB=reCB.exec(cbn))!==null&&cntCB<4){var tCB=mCB[1].trim();if(tCB!=='Crunchbase News'&&tCB.length>10){allItems.push({baslik:tCB,kaynak:'Crunchbase',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cntCB++;}}}catch(e){}\ntry{var uai=await this.helpers.httpRequest({method:'GET',url:'https://www.unite.ai/feed/',timeout:10000});var reUA=new RegExp('<title>([^<]+)</title>','g');var mUA;var cntUA=0;while((mUA=reUA.exec(uai))!==null&&cntUA<4){var tUA=mUA[1].trim();if(tUA!=='Unite.AI'&&tUA.length>10){allItems.push({baslik:tUA,kaynak:'Unite.AI',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cntUA++;}}}catch(e){}\ntry{var vb=await this.helpers.httpRequest({method:'GET',url:'https://venturebeat.com/category/ai/feed/',timeout:10000});var reVB=new RegExp('<title>([^<]+)</title>','g');var mVB;var cntVB=0;while((mVB=reVB.exec(vb))!==null&&cntVB<4){var tVB=mVB[1].trim();if(tVB!=='VentureBeat'&&tVB.length>10){allItems.push({baslik:tVB,kaynak:'VentureBeat AI',puan:0,yorum:0,ozet:'',url:'',kategori:'tech'});cntVB++;}}}catch(e){}\n\n// === DEDUP ===\nvar filtered = allItems.filter(function(item) {\n  return eskiBasliklar.indexOf(item.baslik.toLowerCase().trim()) === -1;\n});\nif (filtered.length === 0) {\n  throw new Error('Tum icerikler daha once paylasilmis, yeni icerik yok.');\n}\n\n// === AGIRLIKLI RASTGELE KATEGORI SECIMI ===\nvar rand = Math.random() * 100;\nvar secilenKategori = '';\nif (rand < 30) secilenKategori = 'reddit';\nelse if (rand < 50) secilenKategori = 'turkiye';\nelse if (rand < 70) secilenKategori = 'dunya';\nelse if (rand < 85) secilenKategori = 'tech';\nelse secilenKategori = 'github';\n\nvar kategoriItems = filtered.filter(function(item) { return item.kategori === secilenKategori; });\nif (kategoriItems.length === 0) kategoriItems = filtered;\n\nkategoriItems.sort(function(a,b){return(b.puan+b.yorum*2)-(a.puan+a.yorum*2);});\n\nvar best;\nif (secilenKategori === 'reddit' || secilenKategori === 'github') {\n  best = kategoriItems[0];\n} else {\n  var rastgeleIdx = Math.floor(Math.random() * Math.min(kategoriItems.length, 5));\n  best = kategoriItems[rastgeleIdx];\n}\n\n// === RASTGELE FORMAT SECIMI ===\nvar formatRand = Math.random() * 100;\nvar formatTipi = '';\nif (formatRand < 40) formatTipi = 'flood';\nelse if (formatRand < 65) formatTipi = 'tek_post';\nelse if (formatRand < 85) formatTipi = 'arac_tanitim';\nelse formatTipi = 'soru_tartisma';\n\n// GitHub kategorisinde arac_tanitim oncelikli\nif (secilenKategori === 'github') formatTipi = (Math.random() < 0.7) ? 'arac_tanitim' : 'flood';\n\nreturn[{json:{baslik:best.baslik,kaynak:best.kaynak,puan:best.puan,yorum:best.yorum,ozet:best.ozet,url:best.url,kategori:secilenKategori,formatTipi:formatTipi,toplamIcerik:allItems.length,yeniIcerik:filtered.length,tarih:new Date().toISOString()}}];"
+      },
+      "id": "a2",
+      "name": "Icerik Topla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [464, 304]
+    },
+    {
+      "parameters": {
+        "jsCode": "var item=$input.first().json;\n\n// ⚠️  GEMINI API KEY — Buraya kendi key'ini yaz\n// aistudio.google.com adresinden ucretsiz alabilirsin\nvar GEMINI_KEY='GEMINI_API_KEY_BURAYA_YAZ';\n\nvar haberUrl=item.url||'';\nvar formatTipi=item.formatTipi||'flood';\n\n// FORMAT TIPINE GORE FARKLI PROMPT\nvar prompt='';\n\nif(formatTipi==='flood'){\n  prompt='Asagidaki haberi temel alarak X Twitter icin TURKCE flood thread hazirla.\\n\\nHaber: '+item.baslik+'\\nKaynak: '+item.kaynak+'\\nOzet: '+(item.ozet||'Yok')+'\\n\\nCEVABINI SADECE JSON FORMATINDA VER.\\n{\\n\"hook\": \"Ana tweet 200-400 karakter. Emoji ile basla. Dikkat cekici.\",\\n\"t1\": \"1/ Detay bilgi 200-400 karakter.\",\\n\"t2\": \"2/ Neden onemli 200-400 karakter.\",\\n\"t3\": \"3/ Etki ve sonuclar 200-400 karakter.\",\\n\"cta\": \"Soru sor 100-200 karakter.\"\\n}\\n\\nKURALLAR: SADECE JSON. Turkce dogal dil. Somut bilgi. Hashtag KULLANMA. BUYUK HARF vurgula. Emojiler kullan.';\n}\nelse if(formatTipi==='tek_post'){\n  prompt='Asagidaki haberi temel alarak X Twitter icin TURKCE tek bir tweet yaz. Uzun ve detayli olsun (1000-2500 karakter). Haber analizi formati.\\n\\nHaber: '+item.baslik+'\\nKaynak: '+item.kaynak+'\\nOzet: '+(item.ozet||'Yok')+'\\n\\nCEVABINI SADECE JSON FORMATINDA VER.\\n{\\n\"hook\": \"Tek tweet. 1000-2500 karakter. Emoji ile basla. Paragraflar halinde yaz. Detayli analiz. Sonunda soru sor.\",\\n\"t1\": \"\",\\n\"t2\": \"\",\\n\"t3\": \"\",\\n\"cta\": \"\"\\n}\\n\\nKURALLAR: SADECE JSON. t1 t2 t3 cta BOS BIRAK. Tum icerik hook icinde olsun. Turkce dogal dil. Hashtag KULLANMA. Paragraflar arasinda bosluk birak. Gazetecilik tonu.';\n}\nelse if(formatTipi==='arac_tanitim'){\n  prompt='Asagidaki AI araci/teknoloji hakkinda X Twitter icin TURKCE heyecanli bir tanitim tweeti yaz.\\n\\nArac/Haber: '+item.baslik+'\\nKaynak: '+item.kaynak+'\\nOzet: '+(item.ozet||'Yok')+'\\n\\nCEVABINI SADECE JSON FORMATINDA VER.\\n{\\n\"hook\": \"Ana tweet 300-600 karakter. Bu araci denediniz mi? veya Bu arayi kacirmayin! gibi basla. Ne ise yarar, neden onemli, nasil kullanilir kisa acikla.\",\\n\"t1\": \"Ek detay veya kisisel yorum 200-400 karakter. Mesela: Ben denedim su isime yaradi gibi.\",\\n\"t2\": \"\",\\n\"t3\": \"\",\\n\"cta\": \"Siz kullandiniz mi? Ne dusunuyorsunuz? 100-200 karakter.\"\\n}\\n\\nKURALLAR: SADECE JSON. t2 t3 BOS BIRAK. Turkce samimi dil. Heyecanli ama abartisiz. Hashtag KULLANMA. Emojiler kullan.';\n}\nelse if(formatTipi==='soru_tartisma'){\n  prompt='Asagidaki haber hakkinda X Twitter icin TURKCE bir tartisma baslatan tweet yaz. Insanlarin yorum yapmasini tetikle.\\n\\nHaber: '+item.baslik+'\\nKaynak: '+item.kaynak+'\\nOzet: '+(item.ozet||'Yok')+'\\n\\nCEVABINI SADECE JSON FORMATINDA VER.\\n{\\n\"hook\": \"Ana tweet 400-800 karakter. Haberi ozetle, sonra GUCLU bir soru sor veya iki karsi gorusu sun. Tartisma yaratacak sekilde yaz.\",\\n\"t1\": \"Kendi gorusunu veya ek bir perspektif ekle 200-400 karakter.\",\\n\"t2\": \"\",\\n\"t3\": \"\",\\n\"cta\": \"\"\\n}\\n\\nKURALLAR: SADECE JSON. t2 t3 cta BOS BIRAK. Turkce samimi dil. Provoke edici ama saygilii. Hashtag KULLANMA.';\n}\n\ntry{\n  var resp=await this.helpers.httpRequest({method:'POST',url:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+GEMINI_KEY,headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.85,maxOutputTokens:4096,topP:0.9}}),timeout:90000});\n  var data=typeof resp==='string'?JSON.parse(resp):resp;\n  var raw=data.candidates[0].content.parts[0].text||'';\n  raw=raw.replace(/```json\\n?/g,'').replace(/```\\n?/g,'').trim();\n  var s=raw.indexOf('{');var e=raw.lastIndexOf('}');\n  if(s===-1||e===-1)throw new Error('JSON yok');\n  var parsed=JSON.parse(raw.substring(s,e+1));\n  if(!parsed.hook||parsed.hook.length<50)throw new Error('hook bos');\n  var hookText=parsed.hook;\n  if(haberUrl&&hookText.indexOf('http')===-1)hookText=hookText.trim()+'\\n\\n'+haberUrl;\n  return[{json:{baslik:item.baslik,kaynak:item.kaynak,url:haberUrl,puan:item.puan,hookTweet:hookText,flood1:parsed.t1||'',flood2:parsed.t2||'',flood3:parsed.t3||'',ctaTweet:parsed.cta||'',formatTipi:formatTipi,kategori:item.kategori||'',durum:'HAZIR',tarih:item.tarih}}];\n}catch(err){\n  throw new Error('Icerik uretilemedi: '+err.message);\n}"
+      },
+      "id": "a3",
+      "name": "GeminiIsle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [688, 304]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Icerikler"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            { "id": "baslik",    "displayName": "baslik",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "kaynak",    "displayName": "kaynak",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "url",       "displayName": "url",       "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "puan",      "displayName": "puan",      "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "hookTweet", "displayName": "hookTweet", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "flood1",    "displayName": "flood1",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "flood2",    "displayName": "flood2",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "flood3",    "displayName": "flood3",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "flood4",    "displayName": "flood4",    "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "ctaTweet",  "displayName": "ctaTweet",  "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "ozet",      "displayName": "ozet",      "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "faydaliMi", "displayName": "faydaliMi", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "durum",     "displayName": "durum",     "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "tarih",     "displayName": "tarih",     "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "a4",
+      "name": "Sheets Kaydet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [912, 304],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.hookTweet }}",
+        "additionalFields": {}
+      },
+      "id": "a5",
+      "name": "Hook Tweet",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [1104, 304],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": { "amount": 20 },
+      "id": "w1",
+      "name": "Bekle20",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1280, 304],
+      "webhookId": "WEBHOOK_ID_1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($('GeminiIsle').item.json.flood1) }},\n  \"reply\": {\n    \"in_reply_to_tweet_id\": \"{{ $('Hook Tweet').item.json.id }}\"\n  }\n}",
+        "options": {
+          "response": { "response": { "neverError": true } },
+          "timeout": 15000
+        }
+      },
+      "id": "r1",
+      "name": "Reply1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1472, 304],
+      "credentials": {
+        "twitterOAuth2Api": { "name": "X account" }
+      }
+    },
+    {
+      "parameters": { "amount": 15 },
+      "id": "w2",
+      "name": "Bekle15a",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1648, 304],
+      "webhookId": "WEBHOOK_ID_2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($('GeminiIsle').item.json.flood2) }},\n  \"reply\": {\n    \"in_reply_to_tweet_id\": \"{{ $('Reply1').item.json.data ? $('Reply1').item.json.data.id : $('Hook Tweet').item.json.id }}\"\n  }\n}",
+        "options": {
+          "response": { "response": { "neverError": true } },
+          "timeout": 15000
+        }
+      },
+      "id": "r2",
+      "name": "Reply2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1824, 304],
+      "credentials": {
+        "twitterOAuth2Api": { "name": "X account" }
+      }
+    },
+    {
+      "parameters": { "amount": 15 },
+      "id": "w3",
+      "name": "Bekle15b",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2000, 304],
+      "webhookId": "WEBHOOK_ID_3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($('GeminiIsle').item.json.flood3) }},\n  \"reply\": {\n    \"in_reply_to_tweet_id\": \"{{ $('Reply2').item.json.data ? $('Reply2').item.json.data.id : $('Hook Tweet').item.json.id }}\"\n  }\n}",
+        "options": {
+          "response": { "response": { "neverError": true } },
+          "timeout": 15000
+        }
+      },
+      "id": "r3",
+      "name": "Reply3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2192, 304],
+      "credentials": {
+        "twitterOAuth2Api": { "name": "X account" }
+      }
+    },
+    {
+      "parameters": { "amount": 15 },
+      "id": "w4",
+      "name": "Bekle15c",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2368, 304],
+      "webhookId": "WEBHOOK_ID_4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify($('GeminiIsle').item.json.ctaTweet) }},\n  \"reply\": {\n    \"in_reply_to_tweet_id\": \"{{ $('Reply3').item.json.data ? $('Reply3').item.json.data.id : $('Hook Tweet').item.json.id }}\"\n  }\n}",
+        "options": {
+          "response": { "response": { "neverError": true } },
+          "timeout": 15000
+        }
+      },
+      "id": "r4",
+      "name": "ReplyCTA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2544, 304],
+      "credentials": {
+        "twitterOAuth2Api": { "name": "X account" }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Her 3 Saatte Tetikle": { "main": [[{ "node": "Eski Basliklar", "type": "main", "index": 0 }]] },
+    "Eski Basliklar":       { "main": [[{ "node": "Icerik Topla",   "type": "main", "index": 0 }]] },
+    "Icerik Topla":         { "main": [[{ "node": "GeminiIsle",     "type": "main", "index": 0 }]] },
+    "GeminiIsle":           { "main": [[{ "node": "Sheets Kaydet",  "type": "main", "index": 0 }]] },
+    "Sheets Kaydet":        { "main": [[{ "node": "Hook Tweet",     "type": "main", "index": 0 }]] },
+    "Hook Tweet":           { "main": [[{ "node": "Bekle20",        "type": "main", "index": 0 }]] },
+    "Bekle20":              { "main": [[{ "node": "Reply1",         "type": "main", "index": 0 }]] },
+    "Reply1":               { "main": [[{ "node": "Bekle15a",       "type": "main", "index": 0 }]] },
+    "Bekle15a":             { "main": [[{ "node": "Reply2",         "type": "main", "index": 0 }]] },
+    "Reply2":               { "main": [[{ "node": "Bekle15b",       "type": "main", "index": 0 }]] },
+    "Bekle15b":             { "main": [[{ "node": "Reply3",         "type": "main", "index": 0 }]] },
+    "Reply3":               { "main": [[{ "node": "Bekle15c",       "type": "main", "index": 0 }]] },
+    "Bekle15c":             { "main": [[{ "node": "ReplyCTA",       "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}
